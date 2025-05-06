@@ -19,7 +19,7 @@ class HealthController extends Controller
 {
     protected array|int|bool $allowAnonymous = true;
     private const CACHE_KEY = 'ohdear-health-check-json';
-    private const CACHE_DURATION = 3600;
+    private const CACHE_DURATION = 600;
 
     public function actionCheck(): Response
     {
