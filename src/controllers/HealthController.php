@@ -23,13 +23,13 @@ class HealthController extends Controller
 
     public function actionCheck(): Response
     {
+        $this->validateHealthCheckSecret();
+
         $force = Craft::$app->request->getQueryParam('force');
 
         if (!$force && ($cachedResult = Craft::$app->cache->get(self::CACHE_KEY))) {
             return $this->asJson(json_decode($cachedResult, true));
         }
-
-        $this->validateHealthCheckSecret();
 
         $checkResults = OhdearApplicationHealth::getInstance()->healthCheck->runChecks();
 
