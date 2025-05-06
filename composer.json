@@ -1,0 +1,56 @@
+{
+  "name": "perfectwebteam/craft-ohdear-application-health",
+  "description": "Oh Dear Application Health checker for Craft CMS.",
+  "type": "craft-plugin",
+  "keywords": [
+    "craft",
+    "cms",
+    "craftcms",
+    "craft-plugin",
+    "ohdear",
+    "oh-dear",
+    "application",
+    "health"
+  ],
+  "support": {
+    "docs": "https://github.com/perfectwebteam/craft-ohdear-application-health/blob/main/README.md",
+    "source": "https://github.com/perfectwebteam/craft-ohdear-application-health",
+    "issues": "https://github.com/perfectwebteam/craft-ohdear-application-health/issues"
+  },
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Perfect Web Team",
+      "homepage": "https://perfectwebteam.com"
+    }
+  ],
+  "require": {
+    "php": "^8.0.2",
+    "craftcms/cms": "^4.0|^5.0",
+    "ohdearapp/health-check-results": "^1.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "perfectwebteam\\ohdearapplicationhealth\\": "src/"
+    }
+  },
+  "extra": {
+    "name": "Oh Dear Application Health",
+    "handle": "ohdear-application-health",
+    "developer": "Perfect Web Team",
+    "developerUrl": "https://perfectwebteam.com",
+    "documentationUrl": "https://github.com/perfectwebteam/craft-ohdear-application-health/blob/main/README.md",
+    "changelogUrl": "https://raw.githubusercontent.com/perfectwebteam/craft-ohdear-application-health/main/CHANGELOG.md",
+    "class": "perfectwebteam\\ohdearapplicationhealth\\OhdearApplicationHealth"
+  },
+  "config": {
+    "platform": {
+      "php": "8.2"
+    },
+    "allow-plugins": {
+      "yiisoft/yii2-composer": true,
+      "craftcms/plugin-installer": true,
+      "php-http/discovery": true
+    }
+  }
+}
