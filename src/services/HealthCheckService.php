@@ -315,6 +315,7 @@ class HealthCheckService extends Component
         $adminUsers = User::find()->admin()->orderBy(['lastLoginDate' => SORT_DESC])->all();
         $adminCount = count($adminUsers);
         $adminMeta = [];
+        $inactiveAdmins = [];
         $status = CheckResult::STATUS_OK;
         $oneYearAgo = (new DateTime())->modify('-1 year');
 
@@ -323,11 +324,16 @@ class HealthCheckService extends Component
             $adminMeta[$user->username] = ['Last Login' => $lastLogin];
 
             if ($user->lastLoginDate === null || $user->lastLoginDate < $oneYearAgo) {
-                $status = CheckResult::STATUS_WARNING;
+                $inactiveAdmins[] = $user->username;
             }
         }
 
-        $message = $adminCount > 0 ? "Admin users found: " . implode(', ', array_keys($adminMeta)) : "No admin users found.";
+        if (!empty($inactiveAdmins)) {
+            $status = CheckResult::STATUS_WARNING;
+            $message = 'Inactive admin accounts (>1 year): ' . implode(', ', $inactiveAdmins);
+        } else {
+            $message = 'All admin users active within the past year.';
+        }
 
         $checkResults->addCheckResult(new CheckResult(
             name: 'AdminUsers',
