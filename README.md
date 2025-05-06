@@ -6,7 +6,7 @@ This plugin provides a [Oh Dear](https://ohdear.app) Application Health checker 
 
 ## 🚦 Health Checks Overview
 
-This plugin performs the following health checks and provides a JSON feed on yourwebsite.com/application-health.json for Oh Dear. The response is cached for 1 hour. 
+This plugin performs the following health checks and provides a JSON feed on yourwebsite.com/application-health.json for Oh Dear. The response is cached for 10 minutes. 
 
 ### ✅ Updates
 Checks if updates are available for Craft CMS and installed plugins.
