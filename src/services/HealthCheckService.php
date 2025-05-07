@@ -49,11 +49,31 @@ class HealthCheckService extends Component
         $meta = [];
         $updateCount = 0;
         $updateNames = [];
+        $criticalUpdates = [];
+        $oldestUpdateDate = null;
+        $now = new DateTime();
 
         if ($updates->cms->getHasReleases()) {
-            $meta['Craft CMS'] = sprintf('%s => %s', Craft::$app->version, $updates->cms->getLatest()->version);
+            $oldest = null;
+            foreach ($updates->cms->releases as $release) {
+                if ($oldest === null || $release->date < $oldest) {
+                    $oldest = $release->date;
+                }
+            }
+
+            $latest = $updates->cms->getLatest();
+            $ageDays = $oldest ? $now->diff($oldest)->days : 'unknown';
+            $meta['Craft CMS'] = sprintf('%s => %s (oldest update %s days ago)', Craft::$app->version, $latest->version, $ageDays);
             $updateNames[] = 'Craft CMS';
             $updateCount++;
+
+            if ($updates->cms->getHasCritical()) {
+                $criticalUpdates[] = 'Craft CMS';
+            }
+
+            if ($oldest && ($oldestUpdateDate === null || $oldest < $oldestUpdateDate)) {
+                $oldestUpdateDate = $oldest;
+            }
         }
 
         foreach ($updates->plugins as $pluginHandle => $pluginUpdate) {
@@ -61,9 +81,26 @@ class HealthCheckService extends Component
                 try {
                     $pluginInfo = Craft::$app->getPlugins()->getPluginInfo($pluginHandle);
                     if ($pluginInfo['isInstalled']) {
-                        $meta[$pluginInfo['name']] = sprintf('%s => %s', $pluginInfo['version'], $pluginUpdate->getLatest()->version);
+                        $oldest = null;
+                        foreach ($pluginUpdate->releases as $release) {
+                            if ($oldest === null || $release->date < $oldest) {
+                                $oldest = $release->date;
+                            }
+                        }
+
+                        $latest = $pluginUpdate->getLatest();
+                        $ageDays = $oldest ? $now->diff($oldest)->days : 'unknown';
+                        $meta[$pluginInfo['name']] = sprintf('%s => %s (oldest update %s days ago)', $pluginInfo['version'], $latest->version, $ageDays);
                         $updateNames[] = $pluginInfo['name'];
                         $updateCount++;
+
+                        if ($pluginUpdate->getHasCritical()) {
+                            $criticalUpdates[] = $pluginInfo['name'];
+                        }
+
+                        if ($oldest && ($oldestUpdateDate === null || $oldest < $oldestUpdateDate)) {
+                            $oldestUpdateDate = $oldest;
+                        }
                     }
                 } catch (\craft\errors\InvalidPluginException $e) {
                     continue;
@@ -71,14 +108,30 @@ class HealthCheckService extends Component
             }
         }
 
-        $status = $updateCount === 0 ? CheckResult::STATUS_OK : CheckResult::STATUS_WARNING;
-        $message = $updateCount === 0 ? 'Plugins and CMS are up to date' : implode(', ', $updateNames) . ' have updates available';
+        $status = CheckResult::STATUS_OK;
+        $message = $updateCount === 0
+            ? 'Plugins and CMS are up to date'
+            : implode(', ', $updateNames) . ' have updates available';
+
+        $shortSummary = "{$updateCount} updates";
+
+        if (!empty($criticalUpdates)) {
+            $status = CheckResult::STATUS_WARNING;
+            $message = '🚨 ' . $message . ' (critical updates: ' . implode(', ', $criticalUpdates) . ')';
+            $shortSummary = "🚨 {$updateCount} updates (critical)";
+        } elseif ($oldestUpdateDate !== null) {
+            $diff = $now->diff($oldestUpdateDate);
+            if ($diff->days > 30) {
+                $status = CheckResult::STATUS_WARNING;
+                $message .= ' (oldest update is over 30 days old)';
+            }
+        }
 
         $checkResults->addCheckResult(new CheckResult(
             name: 'Updates',
             label: 'Available Updates',
             notificationMessage: $message,
-            shortSummary: "{$updateCount} updates",
+            shortSummary: $shortSummary,
             status: $status,
             meta: $meta
         ));
