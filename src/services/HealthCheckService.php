@@ -303,7 +303,7 @@ class HealthCheckService extends Component
                 } else {
                     $meta[$header] = 'Missing';
                     $missingHeaders[] = $header;
-                    $status = CheckResult::STATUS_FAILED;
+                    $status = CheckResult::STATUS_WARNING;
                 }
             }
         } catch (\Exception $e) {
