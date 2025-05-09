@@ -18,26 +18,29 @@ use OhDear\HealthCheckResults\CheckResults;
 
 class HealthCheckService extends Component
 {
-    private const SUPPORTED_PHP_VERSION = '8.1.0';
+    private array $config = [];
 
     public function runChecks(): CheckResults
     {
         $results = new CheckResults(new DateTime());
+        $this->config = Craft::$app->config->getConfigFromFile('ohdear-application-health');
+        $enabledChecks = $this->config['checks'] ?? [];
 
-        $checks = [
-            'addUpdateCheck',
-            'addQueueCheck',
-            'addPendingMigrationsCheck',
-            'addProjectConfigCheck',
-            'addErrorLogCheck',
-            'addGitChangesCheck',
-            'addSecurityHeadersCheck',
-            'addPhpVersionCheck',
-            'addAdminUsersCheck'
-        ];
-
-        foreach ($checks as $check) {
-            $this->$check($results);
+        foreach (
+            [
+                'addUpdateCheck',
+                'addQueueCheck',
+                'addPendingMigrationsCheck',
+                'addProjectConfigCheck',
+                'addErrorLogCheck',
+                'addGitChangesCheck',
+                'addSecurityHeadersCheck',
+                'addPhpVersionCheck',
+                'addAdminUsersCheck'
+            ] as $check) {
+            if (($enabledChecks[$check] ?? true) === true) {
+                $this->$check($results);
+            }
         }
 
         return $results;
@@ -123,9 +126,11 @@ class HealthCheckService extends Component
             $shortSummary = "🚨 {$updateCount} updates (critical)";
         } elseif ($oldestUpdateDate !== null) {
             $diff = $now->diff($oldestUpdateDate);
-            if ($diff->days > 30) {
+            $thresholdDays = $this->config['oldestUpdateWarningDays'] ?? 30;
+
+            if ($diff->days > $thresholdDays) {
                 $status = CheckResult::STATUS_WARNING;
-                $message .= ' (oldest update is over 30 days old)';
+                $message .= " (oldest update is over {$thresholdDays} days old)";
             }
         }
 
@@ -223,7 +228,7 @@ class HealthCheckService extends Component
 
     private function addGitChangesCheck(CheckResults $checkResults): void
     {
-        $repoPath = Craft::getAlias('@root');
+        $repoPath = $this->config['gitRepoPath'] ?? Craft::getAlias('@root');
 
         if (!is_dir($repoPath . '/.git')) {
             $checkResults->addCheckResult(new CheckResult(
@@ -234,6 +239,7 @@ class HealthCheckService extends Component
                 status: CheckResult::STATUS_WARNING,
                 meta: ['Git status' => 'Repository not found']
             ));
+
             return;
         }
 
@@ -283,7 +289,7 @@ class HealthCheckService extends Component
     private function addSecurityHeadersCheck(CheckResults $checkResults): void
     {
         $url = Craft::$app->getRequest()->getHostInfo();
-        $requiredHeaders = [
+        $requiredHeaders = $this->config['requiredSecurityHeaders'] ?? [
             'Content-Security-Policy',
             'X-Frame-Options',
             'Strict-Transport-Security',
@@ -298,7 +304,6 @@ class HealthCheckService extends Component
 
         try {
             $headers = get_headers($url, 1);
-
             $normalizedHeaders = array_change_key_case($headers, CASE_LOWER);
 
             foreach ($requiredHeaders as $header) {
@@ -320,10 +325,13 @@ class HealthCheckService extends Component
                 status: CheckResult::STATUS_FAILED,
                 meta: ['Error' => $e->getMessage()]
             ));
+
             return;
         }
 
-        $message = empty($missingHeaders) ? 'All required security headers are present.' : 'Missing headers: ' . implode(', ', $missingHeaders);
+        $message = empty($missingHeaders)
+            ? 'All required security headers are present.'
+            : 'Missing headers: ' . implode(', ', $missingHeaders);
 
         $checkResults->addCheckResult(new CheckResult(
             name: 'SecurityHeaders',
@@ -359,7 +367,7 @@ class HealthCheckService extends Component
     private function addPhpVersionCheck(CheckResults $checkResults): void
     {
         $currentVersion = PHP_VERSION;
-        $supportedVersion = self::SUPPORTED_PHP_VERSION;
+        $supportedVersion = $this->config['minimumPhpVersion'] ?? '8.1.0';
         $status = version_compare($currentVersion, $supportedVersion, '>=') ? CheckResult::STATUS_OK : CheckResult::STATUS_WARNING;
 
         $message = $status === CheckResult::STATUS_OK
@@ -383,7 +391,8 @@ class HealthCheckService extends Component
         $adminMeta = [];
         $inactiveAdmins = [];
         $status = CheckResult::STATUS_OK;
-        $oneYearAgo = (new DateTime())->modify('-1 year');
+        $threshold = $this->config['inactiveAdminThreshold'] ?? '-1 year';
+        $oneYearAgo = (new DateTime())->modify($threshold);
 
         foreach ($adminUsers as $user) {
             $lastLogin = $user->lastLoginDate ? $user->lastLoginDate->format('Y-m-d H:i:s') : 'Never';
