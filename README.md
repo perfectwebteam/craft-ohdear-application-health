@@ -59,7 +59,7 @@ cd /path/to/my-project.test
 composer require perfectwebteam/craft-ohdear-application-health
 
 # tell Craft to install the plugin
-./craft plugin/install craft-ohdear-application-health
+./craft plugin/install ohdear-application-health
 ```
 
 ## Setup
