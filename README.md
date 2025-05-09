@@ -6,7 +6,9 @@ This plugin provides a [Oh Dear](https://ohdear.app) Application Health checker 
 
 ## 🚦 Health Checks Overview
 
-This plugin performs the following health checks and provides a JSON feed on yourwebsite.com/application-health.json for Oh Dear. The response is cached for 5 minutes. 
+This plugin performs the following health checks and provides a JSON feed on yourwebsite.com/application-health.json for Oh Dear. 
+
+The response is cached for 5 minutes. 
 
 ### ✅ Updates
 Checks if updates are available for Craft CMS and installed plugins.
@@ -30,10 +32,10 @@ Fetches site headers and verifies the presence of key security headers (e.g., CS
 Confirms if the project configuration is fully synchronized.
 
 ### ✅ PHP Version
-Reports the active PHP version running on the server.
+Reports the active PHP version running on the server and verifies against a minimum required version.
 
 ### ✅ Admin Users
-Lists all admin users and flags if any have not logged in for over a year.
+Lists all admin users and flags users who haven’t logged in for a configurable period.
 
 ## Requirements
 
@@ -59,7 +61,7 @@ cd /path/to/my-project.test
 composer require perfectwebteam/craft-ohdear-application-health
 
 # tell Craft to install the plugin
-./craft plugin/install craft-ohdear-application-health
+./craft plugin/install ohdear-application-health
 ```
 
 ## Setup
@@ -69,5 +71,40 @@ Once Oh Dear Application Health is installed:
 1. Go to your site in **Oh Dear** and activate the **Application health** check.
 2. Set the **Health Report URL** to `https://www.yourdomain.com/application-health.json`.
 3. Copy the **Health Report Secret** value and set it as value for `OH_DEAR_HEALTH_REPORT_SECRET=` in your `.env` file.
+4. Optionally add a `config/ohdear-application-health.php` configuration file in which you can override the default settings.
+
+Example configuration:
+
+```php
+<?php
+
+return [
+    'checks' => [
+        'addUpdateCheck' => true,
+        'addQueueCheck' => true,
+        'addPendingMigrationsCheck' => true,
+        'addProjectConfigCheck' => true,
+        'addErrorLogCheck' => true,
+        'addGitChangesCheck' => true,
+        'addSecurityHeadersCheck' => true,
+        'addPhpVersionCheck' => true,
+        'addAdminUsersCheck' => true,
+    ],
+    'oldestUpdateWarningDays' => 30,
+    'minimumPhpVersion' => '8.1.0',
+    'requiredSecurityHeaders' => [
+        'Content-Security-Policy',
+        'X-Frame-Options',
+        'Strict-Transport-Security',
+        'X-Content-Type-Options',
+        'Referrer-Policy',
+        'Permissions-Policy',
+    ],
+    'inactiveAdminThreshold' => '-1 year',
+    'gitRepoPath' => '@root',
+	'queueTotalThreshold' => 10,
+	'queueFailedThreshold' => 2
+];
+```
 
 Brought to you by [Perfect Web Team](https://perfectwebteam.com)

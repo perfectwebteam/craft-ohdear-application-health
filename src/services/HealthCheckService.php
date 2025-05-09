@@ -18,24 +18,29 @@ use OhDear\HealthCheckResults\CheckResults;
 
 class HealthCheckService extends Component
 {
+    private array $config = [];
+
     public function runChecks(): CheckResults
     {
         $results = new CheckResults(new DateTime());
+        $this->config = Craft::$app->config->getConfigFromFile('ohdear-application-health');
+        $enabledChecks = $this->config['checks'] ?? [];
 
-        $checks = [
-            'addUpdateCheck',
-            'addQueueCheck',
-            'addPendingMigrationsCheck',
-            'addProjectConfigCheck',
-            'addErrorLogCheck',
-            'addGitChangesCheck',
-            'addSecurityHeadersCheck',
-            'addPhpVersionCheck',
-            'addAdminUsersCheck'
-        ];
-
-        foreach ($checks as $check) {
-            $this->$check($results);
+        foreach (
+            [
+                'addUpdateCheck',
+                'addQueueCheck',
+                'addPendingMigrationsCheck',
+                'addProjectConfigCheck',
+                'addErrorLogCheck',
+                'addGitChangesCheck',
+                'addSecurityHeadersCheck',
+                'addPhpVersionCheck',
+                'addAdminUsersCheck'
+            ] as $check) {
+            if (($enabledChecks[$check] ?? true) === true) {
+                $this->$check($results);
+            }
         }
 
         return $results;
@@ -121,9 +126,11 @@ class HealthCheckService extends Component
             $shortSummary = "🚨 {$updateCount} updates (critical)";
         } elseif ($oldestUpdateDate !== null) {
             $diff = $now->diff($oldestUpdateDate);
-            if ($diff->days > 30) {
+            $thresholdDays = $this->config['oldestUpdateWarningDays'] ?? 30;
+
+            if ($diff->days > $thresholdDays) {
                 $status = CheckResult::STATUS_WARNING;
-                $message .= ' (oldest update is over 30 days old)';
+                $message .= " (oldest update is over {$thresholdDays} days old)";
             }
         }
 
@@ -139,20 +146,48 @@ class HealthCheckService extends Component
 
     private function addQueueCheck(CheckResults $checkResults): void
     {
-        $queueInfo = Craft::$app->queue->getJobInfo();
+        $queue = Craft::$app->queue;
+
+        $totalWaiting = $queue->getTotalWaiting();
+        $totalReserved = $queue->getTotalReserved();
+        $totalDelayed = $queue->getTotalDelayed();
+        $totalFailed = $queue->getTotalFailed();
+
         $meta = [
-            'Total jobs' => $queueInfo['totalJobs'] ?? 0,
-            'Failed jobs' => $queueInfo['failedJobs'] ?? 0,
+            'Total waiting jobs' => $totalWaiting,
+            'Total reserved jobs' => $totalReserved,
+            'Total delayed jobs' => $totalDelayed,
+            'Total failed jobs' => $totalFailed,
         ];
 
-        $status = ($meta['Failed jobs'] > 0) ? CheckResult::STATUS_FAILED : CheckResult::STATUS_OK;
-        $message = $meta['Total jobs'] === 0 ? 'Queue is empty' : "{$meta['Total jobs']} jobs in the queue";
+        $totalThreshold = $this->config['queueTotalThreshold'] ?? 10;
+        $failedThreshold = $this->config['queueFailedThreshold'] ?? 2;
+
+        $messages = [];
+        $status = CheckResult::STATUS_OK;
+
+        if ($totalFailed >= $failedThreshold) {
+            $messages[] = "{$totalFailed} failed jobs exceeds threshold ({$failedThreshold})";
+            $status = CheckResult::STATUS_WARNING;
+        }
+
+        $totalActiveJobs = $totalWaiting + $totalReserved + $totalDelayed;
+        if ($totalActiveJobs >= $totalThreshold) {
+            $messages[] = "{$totalActiveJobs} total active jobs exceeds threshold ({$totalThreshold})";
+            $status = CheckResult::STATUS_WARNING;
+        }
+
+        if (empty($messages)) {
+            $message = "{$totalWaiting} waiting, {$totalReserved} reserved, {$totalDelayed} delayed, {$totalFailed} failed jobs";
+        } else {
+            $message = implode('; ', $messages);
+        }
 
         $checkResults->addCheckResult(new CheckResult(
             name: 'Queue',
             label: 'Queue Status',
             notificationMessage: $message,
-            shortSummary: "{$meta['Total jobs']} jobs, {$meta['Failed jobs']} failed",
+            shortSummary: "{$totalWaiting} waiting / {$totalReserved} reserved / {$totalDelayed} delayed / {$totalFailed} failed",
             status: $status,
             meta: $meta
         ));
@@ -221,7 +256,7 @@ class HealthCheckService extends Component
 
     private function addGitChangesCheck(CheckResults $checkResults): void
     {
-        $repoPath = Craft::getAlias('@root');
+        $repoPath = $this->config['gitRepoPath'] ?? Craft::getAlias('@root');
 
         if (!is_dir($repoPath . '/.git')) {
             $checkResults->addCheckResult(new CheckResult(
@@ -232,6 +267,7 @@ class HealthCheckService extends Component
                 status: CheckResult::STATUS_WARNING,
                 meta: ['Git status' => 'Repository not found']
             ));
+
             return;
         }
 
@@ -281,7 +317,7 @@ class HealthCheckService extends Component
     private function addSecurityHeadersCheck(CheckResults $checkResults): void
     {
         $url = Craft::$app->getRequest()->getHostInfo();
-        $requiredHeaders = [
+        $requiredHeaders = $this->config['requiredSecurityHeaders'] ?? [
             'Content-Security-Policy',
             'X-Frame-Options',
             'Strict-Transport-Security',
@@ -296,14 +332,16 @@ class HealthCheckService extends Component
 
         try {
             $headers = get_headers($url, 1);
+            $normalizedHeaders = array_change_key_case($headers, CASE_LOWER);
 
             foreach ($requiredHeaders as $header) {
-                if (isset($headers[$header])) {
+                $headerKey = strtolower($header);
+                if (isset($normalizedHeaders[$headerKey])) {
                     $meta[$header] = 'Present';
                 } else {
                     $meta[$header] = 'Missing';
                     $missingHeaders[] = $header;
-                    $status = CheckResult::STATUS_FAILED;
+                    $status = CheckResult::STATUS_WARNING;
                 }
             }
         } catch (\Exception $e) {
@@ -315,10 +353,13 @@ class HealthCheckService extends Component
                 status: CheckResult::STATUS_FAILED,
                 meta: ['Error' => $e->getMessage()]
             ));
+
             return;
         }
 
-        $message = empty($missingHeaders) ? 'All required security headers are present.' : 'Missing headers: ' . implode(', ', $missingHeaders);
+        $message = empty($missingHeaders)
+            ? 'All required security headers are present.'
+            : 'Missing headers: ' . implode(', ', $missingHeaders);
 
         $checkResults->addCheckResult(new CheckResult(
             name: 'SecurityHeaders',
@@ -353,24 +394,33 @@ class HealthCheckService extends Component
 
     private function addPhpVersionCheck(CheckResults $checkResults): void
     {
+        $currentVersion = PHP_VERSION;
+        $supportedVersion = $this->config['minimumPhpVersion'] ?? '8.1.0';
+        $status = version_compare($currentVersion, $supportedVersion, '>=') ? CheckResult::STATUS_OK : CheckResult::STATUS_WARNING;
+
+        $message = $status === CheckResult::STATUS_OK
+            ? "PHP version {$currentVersion} is supported."
+            : "PHP version {$currentVersion} is below supported minimum {$supportedVersion}.";
+
         $checkResults->addCheckResult(new CheckResult(
             name: 'PHP Version',
             label: 'PHP Version Check',
-            notificationMessage: PHP_VERSION,
-            shortSummary: PHP_VERSION,
-            status: CheckResult::STATUS_OK,
+            notificationMessage: $message,
+            shortSummary: $currentVersion,
+            status: $status,
             meta: []
         ));
     }
 
     private function addAdminUsersCheck(CheckResults $checkResults): void
     {
-        $adminUsers = User::find()->admin()->orderBy(['lastLoginDate' => SORT_DESC])->all();
+        $adminUsers = User::find()->admin()->status(['not', 'suspended'])->orderBy(['lastLoginDate' => SORT_DESC])->all();
         $adminCount = count($adminUsers);
         $adminMeta = [];
         $inactiveAdmins = [];
         $status = CheckResult::STATUS_OK;
-        $oneYearAgo = (new DateTime())->modify('-1 year');
+        $threshold = $this->config['inactiveAdminThreshold'] ?? '-1 year';
+        $oneYearAgo = (new DateTime())->modify($threshold);
 
         foreach ($adminUsers as $user) {
             $lastLogin = $user->lastLoginDate ? $user->lastLoginDate->format('Y-m-d H:i:s') : 'Never';
