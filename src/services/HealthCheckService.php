@@ -353,12 +353,20 @@ class HealthCheckService extends Component
 
     private function addPhpVersionCheck(CheckResults $checkResults): void
     {
+        $currentVersion = PHP_VERSION;
+        $supportedVersion = '8.1.0';
+        $status = version_compare($currentVersion, $supportedVersion, '>=') ? CheckResult::STATUS_OK : CheckResult::STATUS_WARNING;
+
+        $message = $status === CheckResult::STATUS_OK
+            ? "PHP version {$currentVersion} is supported."
+            : "PHP version {$currentVersion} is below supported minimum {$supportedVersion}.";
+
         $checkResults->addCheckResult(new CheckResult(
             name: 'PHP Version',
             label: 'PHP Version Check',
-            notificationMessage: PHP_VERSION,
-            shortSummary: PHP_VERSION,
-            status: CheckResult::STATUS_OK,
+            notificationMessage: $message,
+            shortSummary: $currentVersion,
+            status: $status,
             meta: []
         ));
     }
