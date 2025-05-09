@@ -14,6 +14,7 @@ Oh Dear Application Health checker for Craft CMS.
     - `gitRepoPath`
 - Added support for overriding required security headers
 - Added support for overriding Git repository path
+- Queue status check improved, total and warning thresholds
 
 ## 1.0.0 – 2025-05-06
 ### Added

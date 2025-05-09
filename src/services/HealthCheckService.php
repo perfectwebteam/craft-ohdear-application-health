@@ -146,20 +146,48 @@ class HealthCheckService extends Component
 
     private function addQueueCheck(CheckResults $checkResults): void
     {
-        $queueInfo = Craft::$app->queue->getJobInfo();
+        $queue = Craft::$app->queue;
+
+        $totalWaiting = $queue->getTotalWaiting();
+        $totalReserved = $queue->getTotalReserved();
+        $totalDelayed = $queue->getTotalDelayed();
+        $totalFailed = $queue->getTotalFailed();
+
         $meta = [
-            'Total jobs' => $queueInfo['totalJobs'] ?? 0,
-            'Failed jobs' => $queueInfo['failedJobs'] ?? 0,
+            'Total waiting jobs' => $totalWaiting,
+            'Total reserved jobs' => $totalReserved,
+            'Total delayed jobs' => $totalDelayed,
+            'Total failed jobs' => $totalFailed,
         ];
 
-        $status = ($meta['Failed jobs'] > 0) ? CheckResult::STATUS_FAILED : CheckResult::STATUS_OK;
-        $message = $meta['Total jobs'] === 0 ? 'Queue is empty' : "{$meta['Total jobs']} jobs in the queue";
+        $totalThreshold = $this->config['queueTotalThreshold'] ?? 10;
+        $failedThreshold = $this->config['queueFailedThreshold'] ?? 2;
+
+        $messages = [];
+        $status = CheckResult::STATUS_OK;
+
+        if ($totalFailed >= $failedThreshold) {
+            $messages[] = "{$totalFailed} failed jobs exceeds threshold ({$failedThreshold})";
+            $status = CheckResult::STATUS_WARNING;
+        }
+
+        $totalActiveJobs = $totalWaiting + $totalReserved + $totalDelayed;
+        if ($totalActiveJobs >= $totalThreshold) {
+            $messages[] = "{$totalActiveJobs} total active jobs exceeds threshold ({$totalThreshold})";
+            $status = CheckResult::STATUS_WARNING;
+        }
+
+        if (empty($messages)) {
+            $message = "{$totalWaiting} waiting, {$totalReserved} reserved, {$totalDelayed} delayed, {$totalFailed} failed jobs";
+        } else {
+            $message = implode('; ', $messages);
+        }
 
         $checkResults->addCheckResult(new CheckResult(
             name: 'Queue',
             label: 'Queue Status',
             notificationMessage: $message,
-            shortSummary: "{$meta['Total jobs']} jobs, {$meta['Failed jobs']} failed",
+            shortSummary: "{$totalWaiting} waiting / {$totalReserved} reserved / {$totalDelayed} delayed / {$totalFailed} failed",
             status: $status,
             meta: $meta
         ));
