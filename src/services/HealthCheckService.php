@@ -365,7 +365,7 @@ class HealthCheckService extends Component
 
     private function addAdminUsersCheck(CheckResults $checkResults): void
     {
-        $adminUsers = User::find()->admin()->orderBy(['lastLoginDate' => SORT_DESC])->all();
+        $adminUsers = User::find()->admin()->status(['not', 'suspended'])->orderBy(['lastLoginDate' => SORT_DESC])->all();
         $adminCount = count($adminUsers);
         $adminMeta = [];
         $inactiveAdmins = [];
