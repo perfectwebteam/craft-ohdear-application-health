@@ -18,6 +18,8 @@ use OhDear\HealthCheckResults\CheckResults;
 
 class HealthCheckService extends Component
 {
+    private const SUPPORTED_PHP_VERSION = '8.1.0';
+
     public function runChecks(): CheckResults
     {
         $results = new CheckResults(new DateTime());
@@ -354,7 +356,7 @@ class HealthCheckService extends Component
     private function addPhpVersionCheck(CheckResults $checkResults): void
     {
         $currentVersion = PHP_VERSION;
-        $supportedVersion = '8.1.0';
+        $supportedVersion = self::SUPPORTED_PHP_VERSION;
         $status = version_compare($currentVersion, $supportedVersion, '>=') ? CheckResult::STATUS_OK : CheckResult::STATUS_WARNING;
 
         $message = $status === CheckResult::STATUS_OK
