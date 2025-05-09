@@ -289,7 +289,7 @@ class HealthCheckService extends Component
                 'Changed files' => $uncommittedChanges > 0 ? implode(', ', $output) : 'None',
             ];
 
-            $status = $uncommittedChanges === 0 ? CheckResult::STATUS_OK : CheckResult::STATUS_FAILED;
+            $status = $uncommittedChanges === 0 ? CheckResult::STATUS_OK : CheckResult::STATUS_WARNING;
             $message = $uncommittedChanges === 0
                 ? "No uncommitted changes on branch {$currentBranch}."
                 : "{$uncommittedChanges} uncommitted changes detected on branch {$currentBranch}.";
