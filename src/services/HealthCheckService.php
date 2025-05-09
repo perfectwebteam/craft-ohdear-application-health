@@ -299,8 +299,11 @@ class HealthCheckService extends Component
         try {
             $headers = get_headers($url, 1);
 
+            $normalizedHeaders = array_change_key_case($headers, CASE_LOWER);
+
             foreach ($requiredHeaders as $header) {
-                if (isset($headers[$header])) {
+                $headerKey = strtolower($header);
+                if (isset($normalizedHeaders[$headerKey])) {
                     $meta[$header] = 'Present';
                 } else {
                     $meta[$header] = 'Missing';
