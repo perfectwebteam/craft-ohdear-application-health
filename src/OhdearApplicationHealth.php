@@ -11,7 +11,6 @@ namespace perfectwebteam\ohdearapplicationhealth;
 use Craft;
 use craft\base\Model;
 use craft\base\Plugin;
-use perfectwebteam\ohdearapplicationhealth\models\Settings;
 use perfectwebteam\ohdearapplicationhealth\services\HealthCheckService;
 
 class OhdearApplicationHealth extends Plugin
