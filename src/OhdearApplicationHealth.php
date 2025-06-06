@@ -11,6 +11,7 @@ namespace perfectwebteam\ohdearapplicationhealth;
 use Craft;
 use craft\base\Model;
 use craft\base\Plugin;
+use perfectwebteam\ohdearapplicationhealth\models\Settings;
 use perfectwebteam\ohdearapplicationhealth\services\HealthCheckService;
 
 class OhdearApplicationHealth extends Plugin
@@ -31,5 +32,10 @@ class OhdearApplicationHealth extends Plugin
         Craft::$app->getUrlManager()->addRules([
             'application-health.json' => 'ohdear-application-health/health/check',
         ], false);
+    }
+
+    protected function createSettingsModel(): ?Model
+    {
+        return Craft::createObject(Settings::class);
     }
 }
