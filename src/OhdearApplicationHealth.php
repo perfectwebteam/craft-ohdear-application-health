@@ -11,17 +11,13 @@ namespace perfectwebteam\ohdearapplicationhealth;
 use Craft;
 use craft\base\Model;
 use craft\base\Plugin;
-use perfectwebteam\ohdearapplicationhealth\models\Settings;
 use perfectwebteam\ohdearapplicationhealth\services\HealthCheckService;
 
 class OhdearApplicationHealth extends Plugin
 {
     public string $schemaVersion = '1.0.0';
-
-    /**
-     * @inheritdoc
-     */
     public bool $hasCpSettings = false;
+    public bool $hasCpSection = false;
 
     public function init(): void
     {

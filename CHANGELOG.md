@@ -2,6 +2,10 @@
 
 Oh Dear Application Health checker for Craft CMS.
 
+## 1.1.1 – 2025-06-06
+### Fixed
+- Set plugin settings flag
+
 ## 1.1.0 – 2025-05-09
 ### Added
 - Support for `config/ohdear-application-health.php` config file (example in documentation)

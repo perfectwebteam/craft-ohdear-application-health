@@ -102,8 +102,8 @@ return [
     ],
     'inactiveAdminThreshold' => '-1 year',
     'gitRepoPath' => '@root',
-	'queueTotalThreshold' => 10,
-	'queueFailedThreshold' => 2
+    'queueTotalThreshold' => 10,
+    'queueFailedThreshold' => 2
 ];
 ```
 
