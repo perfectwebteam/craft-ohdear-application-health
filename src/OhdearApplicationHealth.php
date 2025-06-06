@@ -16,11 +16,8 @@ use perfectwebteam\ohdearapplicationhealth\services\HealthCheckService;
 class OhdearApplicationHealth extends Plugin
 {
     public string $schemaVersion = '1.0.0';
-
-    /**
-     * @inheritdoc
-     */
     public bool $hasCpSettings = false;
+    public bool $hasCpSection = false;
 
     public function init(): void
     {
