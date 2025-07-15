@@ -126,7 +126,7 @@ class HealthCheckService extends Component
             $shortSummary = "🚨 {$updateCount} updates (critical)";
         } elseif ($oldestUpdateDate !== null) {
             $diff = $now->diff($oldestUpdateDate);
-            $thresholdDays = $this->config['oldestUpdateWarningDays'] ?? 30;
+            $thresholdDays = $this->config['oldestUpdateWarningDays'] ?? 40;
 
             if ($diff->days > $thresholdDays) {
                 $status = CheckResult::STATUS_WARNING;
