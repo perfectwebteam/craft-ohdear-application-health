@@ -36,9 +36,12 @@ class HealthCheckService extends Component
                 'addGitChangesCheck',
                 'addSecurityHeadersCheck',
                 'addPhpVersionCheck',
-                'addAdminUsersCheck'
+                'addAdminUsersCheck',
+                'addDiskUsageCheck'
             ] as $check) {
-            if (($enabledChecks[$check] ?? true) === true) {
+            $defaultEnabled = ($check === 'addDiskUsageCheck') ? false : true;
+
+            if (($enabledChecks[$check] ?? $defaultEnabled) === true) {
                 $this->$check($results);
             }
         }
@@ -446,5 +449,59 @@ class HealthCheckService extends Component
             status: $status,
             meta: $adminMeta
         ));
+    }
+
+    private function addDiskUsageCheck(CheckResults $checkResults): void
+    {
+        $path = $this->config['diskUsagePath'] ?? '/';
+        $threshold = $this->config['diskUsageThreshold'] ?? 90;
+
+        $meta = [];
+        $status = CheckResult::STATUS_OK;
+
+        try {
+            $totalSpace = disk_total_space($path);
+            $freeSpace = disk_free_space($path);
+
+            if ($totalSpace === false || $freeSpace === false || $totalSpace === 0) {
+                throw new \Exception("Unable to retrieve disk space for path: {$path}");
+            }
+
+            $usedSpace = $totalSpace - $freeSpace;
+            $usedPercentage = round(($usedSpace / $totalSpace) * 100, 2);
+
+            $meta = [
+                'Path' => $path,
+                'Total space (GB)' => round($totalSpace / (1024 ** 3), 2),
+                'Used space (GB)' => round($usedSpace / (1024 ** 3), 2),
+                'Free space (GB)' => round($freeSpace / (1024 ** 3), 2),
+                'Used (%)' => "{$usedPercentage}%",
+            ];
+
+            if ($usedPercentage >= $threshold) {
+                $status = CheckResult::STATUS_FAILED;
+                $message = "Disk usage at {$usedPercentage}% exceeds threshold ({$threshold}%)";
+            } else {
+                $message = "Disk usage is at {$usedPercentage}%";
+            }
+
+            $checkResults->addCheckResult(new CheckResult(
+                name: 'DiskUsage',
+                label: 'Disk Usage Check',
+                notificationMessage: $message,
+                shortSummary: "{$usedPercentage}%",
+                status: $status,
+                meta: $meta
+            ));
+        } catch (\Exception $e) {
+            $checkResults->addCheckResult(new CheckResult(
+                name: 'DiskUsage',
+                label: 'Disk Usage Check',
+                notificationMessage: 'Error checking disk usage.',
+                shortSummary: 'Disk usage check failed',
+                status: CheckResult::STATUS_FAILED,
+                meta: ['Error' => $e->getMessage()]
+            ));
+        }
     }
 }
