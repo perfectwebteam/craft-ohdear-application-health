@@ -2,6 +2,10 @@
 
 Oh Dear Application Health checker for Craft CMS.
 
+## 1.2.0 – 2025-09-17
+### Added
+- Add disk usage check and config options
+
 ## 1.1.3 – 2025-07-15
 ### Changed
 - Update default warning for oldest update to 40 days

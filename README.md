@@ -2,19 +2,19 @@
 
 <h1 align="center">Oh Dear Application Health checker for Craft CMS</h1>
 
-This plugin provides a [Oh Dear](https://ohdear.app) Application Health checker [Craft CMS](https://craftcms.com/).
+This plugin provides an [Oh Dear](https://ohdear.app) Application Health checker for [Craft CMS](https://craftcms.com/).
 
 ## 🚦 Health Checks Overview
 
-This plugin performs the following health checks and provides a JSON feed on yourwebsite.com/application-health.json for Oh Dear. 
+This plugin performs the following health checks and provides a JSON feed at `/application-health.json` for Oh Dear.
 
-The response is cached for 5 minutes. 
+The response is cached for 5 minutes.
 
 ### ✅ Updates
-Checks if updates are available for Craft CMS and installed plugins.
+Checks if updates are available for Craft CMS and installed plugins, including critical ones.
 
 ### ✅ Queue Status
-Monitors the number of jobs in the queue and detects any failed jobs.
+Monitors the number of jobs in the queue and detects failed, reserved, or delayed jobs using configurable thresholds.
 
 ### ✅ Pending Migrations
 Verifies if there are any unapplied database migrations.
@@ -32,10 +32,14 @@ Fetches site headers and verifies the presence of key security headers (e.g., CS
 Confirms if the project configuration is fully synchronized.
 
 ### ✅ PHP Version
-Reports the active PHP version running on the server and verifies against a minimum required version.
+Reports the active PHP version running on the server and verifies it against a minimum required version.
 
 ### ✅ Admin Users
 Lists all admin users and flags users who haven’t logged in for a configurable period.
+
+### ✅ Disk Usage
+Monitors disk space usage and flags if usage exceeds a configurable threshold.  
+*(Disabled by default to avoid noise on shared servers.)*
 
 ## Requirements
 
@@ -54,13 +58,13 @@ Go to the Plugin Store in your project’s Control Panel and search for “Oh De
 Open your terminal and run the following commands:
 
 ```bash
-# go to the project directory
+# Go to the project directory
 cd /path/to/my-project.test
 
-# tell Composer to load the plugin
+# Tell Composer to load the plugin
 composer require perfectwebteam/craft-ohdear-application-health
 
-# tell Craft to install the plugin
+# Tell Craft to install the plugin
 ./craft plugin/install ohdear-application-health
 ```
 
@@ -89,6 +93,7 @@ return [
         'addSecurityHeadersCheck' => true,
         'addPhpVersionCheck' => true,
         'addAdminUsersCheck' => true,
+        'addDiskUsageCheck' => false,
     ],
     'oldestUpdateWarningDays' => 30,
     'minimumPhpVersion' => '8.1.0',
@@ -103,7 +108,9 @@ return [
     'inactiveAdminThreshold' => '-1 year',
     'gitRepoPath' => '@root',
     'queueTotalThreshold' => 10,
-    'queueFailedThreshold' => 2
+    'queueFailedThreshold' => 2,
+    'diskUsagePath' => '/',
+	'diskUsageThreshold' => 90,
 ];
 ```
 
