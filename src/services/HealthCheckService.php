@@ -376,9 +376,9 @@ class HealthCheckService extends Component
 
     private function addProjectConfigCheck(CheckResults $checkResults): void
     {
-        $isConfigApplied = Craft::$app->getProjectConfig()->areChangesPending();
+        $hasPendingChanges = Craft::$app->getProjectConfig()->areChangesPending();
 
-        if ($isConfigApplied) {
+        if ($hasPendingChanges) {
             $status = CheckResult::STATUS_FAILED;
             $message = 'Unapplied project config changes detected.';
         } else {
@@ -429,7 +429,7 @@ class HealthCheckService extends Component
             $lastLogin = $user->lastLoginDate ? $user->lastLoginDate->format('Y-m-d H:i:s') : 'Never';
             $adminMeta[$user->username] = ['Last Login' => $lastLogin];
 
-            if ($user->lastLoginDate === null || $user->lastLoginDate < $oneYearAgo) {
+            if ($user->lastLoginDate !== null && $user->lastLoginDate < $oneYearAgo) {
                 $inactiveAdmins[] = $user->username;
             }
         }
