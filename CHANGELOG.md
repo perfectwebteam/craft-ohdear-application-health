@@ -2,6 +2,10 @@
 
 Oh Dear Application Health checker for Craft CMS.
 
+## 1.2.1 – 2026-04-27
+### Fixed
+- Admin users check no longer flags admins that have never logged in as inactive
+
 ## 1.2.0 – 2025-09-17
 ### Added
 - Add disk usage check and config options
