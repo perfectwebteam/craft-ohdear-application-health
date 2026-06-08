@@ -2,6 +2,10 @@
 
 Oh Dear Application Health checker for Craft CMS.
 
+## 1.3.0 – 2026-06-08
+### Added
+- Plugin & CMS license check: flags invalid, astray, trial and mismatched licenses for Craft CMS and installed plugins, and reports update eligibility, renewal price and renewal URL when available
+
 ## 1.2.1 – 2026-04-27
 ### Fixed
 - Admin users check no longer flags admins that have never logged in as inactive
