@@ -13,6 +13,9 @@ The response is cached for 5 minutes.
 ### ✅ Updates
 Checks if updates are available for Craft CMS and installed plugins, including critical ones.
 
+### ✅ Plugin & CMS Licenses
+Inspects the license key status of Craft CMS itself and every commercial plugin, and flags problems: `invalid` and `astray` licenses fail, `trial` and `mismatched` licenses warn, `valid` licenses pass. When the Craft update API is reachable it also reports update eligibility (`expired` fails, `breakpoint` warns) along with the renewal price and renewal URL. Free products (status `unknown`) are skipped.
+
 ### ✅ Queue Status
 Monitors the number of jobs in the queue and detects failed, reserved, or delayed jobs using configurable thresholds.
 
@@ -85,6 +88,7 @@ Example configuration:
 return [
     'checks' => [
         'addUpdateCheck' => true,
+        'addPluginLicenseCheck' => true,
         'addQueueCheck' => true,
         'addPendingMigrationsCheck' => true,
         'addProjectConfigCheck' => true,

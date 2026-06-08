@@ -29,6 +29,7 @@ class HealthCheckService extends Component
         foreach (
             [
                 'addUpdateCheck',
+                'addPluginLicenseCheck',
                 'addQueueCheck',
                 'addPendingMigrationsCheck',
                 'addProjectConfigCheck',
@@ -140,6 +141,133 @@ class HealthCheckService extends Component
         $checkResults->addCheckResult(new CheckResult(
             name: 'Updates',
             label: 'Available Updates',
+            notificationMessage: $message,
+            shortSummary: $shortSummary,
+            status: $status,
+            meta: $meta
+        ));
+    }
+
+    private function addPluginLicenseCheck(CheckResults $checkResults): void
+    {
+        // Renewal/expiry data is optional enrichment; fetch updates defensively.
+        $updates = null;
+        try {
+            $updateData = Craft::$app->getApi()->getUpdates([]);
+            $updates = new Updates($updateData);
+        } catch (\Throwable $e) {
+        }
+
+        $licenses = [];
+
+        // Craft caches the parsed x-craft-license-info header as a "licenseInfo" array keyed
+        // by package ("craft" for the CMS, plugin handles for plugins).
+        $cmsStatus = 'unknown';
+        try {
+            $licenseInfo = Craft::$app->getCache()->get('licenseInfo');
+            if (is_array($licenseInfo) && isset($licenseInfo['craft']['status'])) {
+                $cmsStatus = $licenseInfo['craft']['status'];
+            }
+        } catch (\Throwable $e) {
+        }
+
+        // Craft CMS is always shown, even when its status is "unknown" (e.g. dev/Solo).
+        $licenses[] = [
+            'name' => 'Craft CMS',
+            'status' => $cmsStatus,
+            'update' => $updates->cms ?? null,
+            'alwaysShow' => true,
+        ];
+
+        foreach (Craft::$app->getPlugins()->getAllPluginInfo() as $handle => $info) {
+            if (!($info['isInstalled'] ?? false)) {
+                continue;
+            }
+
+            $licenses[] = [
+                'name' => $info['name'] ?? $handle,
+                'status' => $info['licenseKeyStatus'] ?? 'unknown',
+                'update' => $updates->plugins[$handle] ?? null,
+                'alwaysShow' => false,
+            ];
+        }
+
+        $meta = [];
+        $problems = [];
+        $status = CheckResult::STATUS_OK;
+
+        foreach ($licenses as $license) {
+            $licenseStatus = $license['status'] ?: 'unknown';
+
+            // Skip free plugins (status "unknown") to avoid noise; always keep Craft CMS.
+            if (!($license['alwaysShow'] ?? false) && $licenseStatus === 'unknown') {
+                continue;
+            }
+
+            $name = $license['name'];
+            $parts = ["license: {$licenseStatus}"];
+
+            $itemStatus = match ($licenseStatus) {
+                'invalid', 'astray' => CheckResult::STATUS_FAILED,
+                'trial', 'mismatched' => CheckResult::STATUS_WARNING,
+                default => CheckResult::STATUS_OK,
+            };
+
+            $update = $license['update'];
+            if ($update !== null) {
+                $updateStatus = $update->status ?? null;
+
+                if ($updateStatus === 'expired') {
+                    $parts[] = 'updates: expired';
+                    $itemStatus = CheckResult::STATUS_FAILED;
+                } elseif ($updateStatus === 'breakpoint') {
+                    $parts[] = 'updates: breakpoint';
+                    if ($itemStatus === CheckResult::STATUS_OK) {
+                        $itemStatus = CheckResult::STATUS_WARNING;
+                    }
+                }
+
+                if (!empty($update->renewalPrice)) {
+                    $renewal = 'renewal: ' . $update->renewalPrice;
+                    if (!empty($update->renewalCurrency)) {
+                        $renewal .= ' ' . $update->renewalCurrency;
+                    }
+                    if (!empty($update->renewalUrl)) {
+                        $renewal .= ' (' . $update->renewalUrl . ')';
+                    }
+                    $parts[] = $renewal;
+                }
+            }
+
+            if ($itemStatus === CheckResult::STATUS_FAILED) {
+                $status = CheckResult::STATUS_FAILED;
+                $problems[] = $name;
+            } elseif ($itemStatus === CheckResult::STATUS_WARNING) {
+                if ($status !== CheckResult::STATUS_FAILED) {
+                    $status = CheckResult::STATUS_WARNING;
+                }
+                $problems[] = $name;
+            }
+
+            $meta[$name] = implode(', ', $parts);
+        }
+
+        $licensedCount = count($meta);
+
+        if ($licensedCount === 0) {
+            $message = 'No commercial licenses to check.';
+            $shortSummary = '0 licenses';
+        } elseif (empty($problems)) {
+            $message = "No license issues found across {$licensedCount} licenses.";
+            $shortSummary = "{$licensedCount} licenses OK";
+        } else {
+            $message = 'License issues: ' . implode(', ', $problems);
+            $shortSummary = count($problems) . " of {$licensedCount} with issues";
+        }
+
+        $checkResults->addCheckResult(new CheckResult(
+            name: 'Licenses',
+            label: 'Plugin & CMS License Check',
             notificationMessage: $message,
             shortSummary: $shortSummary,
             status: $status,
