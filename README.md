@@ -23,7 +23,7 @@ Monitors the number of jobs in the queue and detects failed, reserved, or delaye
 Verifies if there are any unapplied database migrations.
 
 ### ✅ Error Logs
-Counts recent errors in today’s log files (`web.log`, `queue.log`, `console.log`).
+Counts recent errors in today’s log files (`web`, `queue`, `console`), supporting both the Monolog format used by Craft 4.4+ and Craft 5 (`[web.ERROR]`) and the older `[error]` format. Which log files and which severities (`error`, `critical`, `alert`, `emergency`) are counted is configurable.
 
 ### ✅ Git Repository Status
 Checks if a `.git` repository exists and whether there are uncommitted changes.
@@ -113,6 +113,8 @@ return [
     'gitRepoPath' => '@root',
     'queueTotalThreshold' => 10,
     'queueFailedThreshold' => 2,
+    'errorLogFiles' => ['web', 'queue', 'console'],
+    'errorLogLevels' => ['error', 'critical', 'alert', 'emergency'],
     'diskUsagePath' => '/',
 	'diskUsageThreshold' => 90,
 ];
