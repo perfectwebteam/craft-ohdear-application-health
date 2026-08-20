@@ -346,30 +346,49 @@ class HealthCheckService extends Component
     {
         $logPath = Craft::$app->getPath()->getLogPath();
         $dateSuffix = date('Y-m-d');
-        $logFiles = [
-            "web-{$dateSuffix}.log",
-            "queue-{$dateSuffix}.log",
-            "console-{$dateSuffix}.log",
-        ];
+        $logNames = $this->config['errorLogFiles'] ?? ['web', 'queue', 'console'];
+        $levels = $this->config['errorLogLevels'] ?? ['error', 'critical', 'alert', 'emergency'];
+
+        // Matches the Craft 3 style `[error]` as well as the Monolog style
+        // `[web.ERROR]` used by Craft 4.4+ and Craft 5
+        $pattern = '/\[(?:[a-z0-9_.-]+\.)?(?:' . implode('|', array_map(
+            static fn(string $level): string => preg_quote($level, '/'),
+            $levels
+        )) . ')\]/i';
 
         $meta = [];
         $errorCount = 0;
 
-        foreach ($logFiles as $logFile) {
-            $filePath = $logPath . DIRECTORY_SEPARATOR . $logFile;
+        foreach ($logNames as $logName) {
+            // Craft 4.4+ and Craft 5 rotate log files daily, older setups don’t
+            $candidates = [
+                "{$logName}-{$dateSuffix}.log",
+                "{$logName}.log",
+            ];
 
-            if (file_exists($filePath)) {
-                try {
-                    $logContents = file_get_contents($filePath);
-                    $fileErrorCount = substr_count($logContents, '[error]');
-                    $meta[$logFile] = "{$fileErrorCount} errors";
-                    $errorCount += $fileErrorCount;
-                } catch (\Exception $e) {
-                    $meta[$logFile] = 'Error reading file';
+            $logFile = null;
+
+            foreach ($candidates as $candidate) {
+                if (is_file($logPath . DIRECTORY_SEPARATOR . $candidate)) {
+                    $logFile = $candidate;
+                    break;
                 }
-            } else {
-                $meta[$logFile] = 'File not found';
             }
+
+            if ($logFile === null) {
+                $meta[$candidates[0]] = 'File not found';
+                continue;
+            }
+
+            $fileErrorCount = $this->countLogMatches($logPath . DIRECTORY_SEPARATOR . $logFile, $pattern);
+
+            if ($fileErrorCount === null) {
+                $meta[$logFile] = 'Error reading file';
+                continue;
+            }
+
+            $meta[$logFile] = "{$fileErrorCount} errors";
+            $errorCount += $fileErrorCount;
         }
 
         $status = $errorCount === 0 ? CheckResult::STATUS_OK : CheckResult::STATUS_WARNING;
@@ -383,6 +402,35 @@ class HealthCheckService extends Component
             status: $status,
             meta: $meta
         ));
+    }
+
+    /**
+     * Counts the lines in a log file that match the given pattern, reading the
+     * file line by line to keep memory usage low on large log files.
+     *
+     * @return int|null The number of matching lines, or `null` if the file could not be read
+     */
+    private function countLogMatches(string $filePath, string $pattern): ?int
+    {
+        $handle = @fopen($filePath, 'rb');
+
+        if ($handle === false) {
+            return null;
+        }
+
+        $count = 0;
+
+        try {
+            while (($line = fgets($handle)) !== false) {
+                if (preg_match($pattern, $line) === 1) {
+                    $count++;
+                }
+            }
+        } finally {
+            fclose($handle);
+        }
+
+        return $count;
     }
 
     private function addGitChangesCheck(CheckResults $checkResults): void
