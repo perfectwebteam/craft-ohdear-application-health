@@ -2,13 +2,13 @@
 
 Oh Dear Application Health checker for Craft CMS.
 
-## Unreleased
+## 1.4.0 – 2026-08-20
+### Added
+- `errorLogFiles` and `errorLogLevels` config options for the error log check
+
 ### Fixed
 - Error log check now detects errors in the Monolog log format used by Craft 4.4+ and Craft 5 (`[web.ERROR]`, `[queue.CRITICAL]`), in addition to the older `[error]` format ([#6](https://github.com/perfectwebteam/craft-ohdear-application-health/issues/6))
 - Error log check now also counts `critical`, `alert` and `emergency` entries, reads log files line by line to limit memory usage on large logs, and reports unreadable files correctly
-
-### Added
-- `errorLogFiles` and `errorLogLevels` config options for the error log check
 
 ## 1.3.0 – 2026-06-08
 ### Added
