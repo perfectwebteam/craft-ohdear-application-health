@@ -13,6 +13,8 @@ use craft\base\Component;
 use craft\elements\User;
 use craft\models\Updates;
 use DateTime;
+use DateTimeImmutable;
+use DateTimeZone;
 use OhDear\HealthCheckResults\CheckResult;
 use OhDear\HealthCheckResults\CheckResults;
 
@@ -345,9 +347,27 @@ class HealthCheckService extends Component
     private function addErrorLogCheck(CheckResults $checkResults): void
     {
         $logPath = Craft::$app->getPath()->getLogPath();
-        $dateSuffix = date('Y-m-d');
         $logNames = $this->config['errorLogFiles'] ?? ['web', 'queue', 'console'];
         $levels = $this->config['errorLogLevels'] ?? ['error', 'critical', 'alert', 'emergency'];
+        $ignoreClientErrors = (bool)($this->config['errorLogIgnoreClientErrors'] ?? true);
+        $windowMinutes = (int)($this->config['errorLogWindowMinutes'] ?? 0);
+
+        // Log timestamps are written in Craft's time zone, so compare in that zone too
+        $timeZone = new DateTimeZone(Craft::$app->getTimeZone());
+        $now = new DateTimeImmutable('now', $timeZone);
+        $since = $windowMinutes > 0 ? $now->modify("-{$windowMinutes} minutes") : null;
+
+        // Daily rotated log files to look at: today's, plus earlier days when the
+        // window reaches back past midnight
+        $dateSuffixes = [];
+        $day = ($since ?? $now)->setTime(0, 0);
+
+        while ($day <= $now) {
+            $dateSuffixes[] = $day->format('Y-m-d');
+            $day = $day->modify('+1 day');
+        }
+
+        $dateSuffix = $now->format('Y-m-d');
 
         // Matches the Craft 3 style `[error]` as well as the Monolog style
         // `[web.ERROR]` used by Craft 4.4+ and Craft 5
@@ -361,38 +381,41 @@ class HealthCheckService extends Component
 
         foreach ($logNames as $logName) {
             // Craft 4.4+ and Craft 5 rotate log files daily, older setups don’t
-            $candidates = [
-                "{$logName}-{$dateSuffix}.log",
-                "{$logName}.log",
-            ];
+            $logFiles = array_values(array_filter(
+                array_map(static fn(string $suffix): string => "{$logName}-{$suffix}.log", $dateSuffixes),
+                static fn(string $file): bool => is_file($logPath . DIRECTORY_SEPARATOR . $file)
+            ));
 
-            $logFile = null;
+            if (empty($logFiles) && is_file($logPath . DIRECTORY_SEPARATOR . "{$logName}.log")) {
+                $logFiles = ["{$logName}.log"];
+            }
 
-            foreach ($candidates as $candidate) {
-                if (is_file($logPath . DIRECTORY_SEPARATOR . $candidate)) {
-                    $logFile = $candidate;
-                    break;
+            if (empty($logFiles)) {
+                $meta["{$logName}-{$dateSuffix}.log"] = 'File not found';
+                continue;
+            }
+
+            foreach ($logFiles as $logFile) {
+                $fileErrorCount = $this->countLogMatches(
+                    $logPath . DIRECTORY_SEPARATOR . $logFile,
+                    $pattern,
+                    $ignoreClientErrors,
+                    $since
+                );
+
+                if ($fileErrorCount === null) {
+                    $meta[$logFile] = 'Error reading file';
+                    continue;
                 }
+
+                $meta[$logFile] = "{$fileErrorCount} errors";
+                $errorCount += $fileErrorCount;
             }
-
-            if ($logFile === null) {
-                $meta[$candidates[0]] = 'File not found';
-                continue;
-            }
-
-            $fileErrorCount = $this->countLogMatches($logPath . DIRECTORY_SEPARATOR . $logFile, $pattern);
-
-            if ($fileErrorCount === null) {
-                $meta[$logFile] = 'Error reading file';
-                continue;
-            }
-
-            $meta[$logFile] = "{$fileErrorCount} errors";
-            $errorCount += $fileErrorCount;
         }
 
+        $period = $since !== null ? "in the last {$windowMinutes} minutes" : 'today';
         $status = $errorCount === 0 ? CheckResult::STATUS_OK : CheckResult::STATUS_WARNING;
-        $message = $errorCount === 0 ? 'No recent errors in logs.' : "{$errorCount} total errors found in logs.";
+        $message = $errorCount === 0 ? "No errors in logs {$period}." : "{$errorCount} errors found in logs {$period}.";
 
         $checkResults->addCheckResult(new CheckResult(
             name: 'ErrorLogs',
@@ -408,10 +431,16 @@ class HealthCheckService extends Component
      * Counts the lines in a log file that match the given pattern, reading the
      * file line by line to keep memory usage low on large log files.
      *
+     * @param bool $ignoreClientErrors Skip 4xx HTTP exceptions (bots, expired sessions, missing files)
+     * @param DateTimeImmutable|null $since Only count lines logged at or after this moment
      * @return int|null The number of matching lines, or `null` if the file could not be read
      */
-    private function countLogMatches(string $filePath, string $pattern): ?int
-    {
+    private function countLogMatches(
+        string $filePath,
+        string $pattern,
+        bool $ignoreClientErrors = false,
+        ?DateTimeImmutable $since = null,
+    ): ?int {
         $handle = @fopen($filePath, 'rb');
 
         if ($handle === false) {
@@ -422,9 +451,23 @@ class HealthCheckService extends Component
 
         try {
             while (($line = fgets($handle)) !== false) {
-                if (preg_match($pattern, $line) === 1) {
-                    $count++;
+                if (preg_match($pattern, $line) !== 1) {
+                    continue;
                 }
+
+                if ($ignoreClientErrors && preg_match('/HttpException:4\d\d\]/', $line) === 1) {
+                    continue;
+                }
+
+                if ($since !== null && preg_match('/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})/', $line, $matches) === 1) {
+                    $loggedAt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $matches[1], $since->getTimezone());
+
+                    if ($loggedAt !== false && $loggedAt < $since) {
+                        continue;
+                    }
+                }
+
+                $count++;
             }
         } finally {
             fclose($handle);

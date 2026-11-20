@@ -25,6 +25,10 @@ Verifies if there are any unapplied database migrations.
 ### ✅ Error Logs
 Counts recent errors in today’s log files (`web`, `queue`, `console`), supporting both the Monolog format used by Craft 4.4+ and Craft 5 (`[web.ERROR]`) and the older `[error]` format. Which log files and which severities (`error`, `critical`, `alert`, `emergency`) are counted is configurable.
 
+To cut down on noise:
+- 4xx HTTP exceptions (`HttpException:400`, `HttpException:404`, …) are skipped by default, as they are usually caused by bots or expired sessions rather than a problem on the server. Set `errorLogIgnoreClientErrors` to `false` to count them as well.
+- you can optionally set `errorLogWindowMinutes` to only count errors logged in the last given number of minutes (based on the timestamp of each log line, in Craft’s time zone), so the check returns to OK once a problem has been fixed. When not set, all errors of today are counted.
+
 ### ✅ Git Repository Status
 Checks if a `.git` repository exists and whether there are uncommitted changes.
 
@@ -115,6 +119,8 @@ return [
     'queueFailedThreshold' => 2,
     'errorLogFiles' => ['web', 'queue', 'console'],
     'errorLogLevels' => ['error', 'critical', 'alert', 'emergency'],
+    'errorLogIgnoreClientErrors' => true,
+    'errorLogWindowMinutes' => null,
     'diskUsagePath' => '/',
 	'diskUsageThreshold' => 90,
 ];
