@@ -2,6 +2,14 @@
 
 Oh Dear Application Health checker for Craft CMS.
 
+## Unreleased
+### Added
+- `errorLogIgnoreClientErrors` config option for the error log check ([#8](https://github.com/perfectwebteam/craft-ohdear-application-health/issues/8))
+- `errorLogWindowMinutes` config option to only count errors logged in the last given number of minutes, so the error log check recovers once a problem is fixed ([#8](https://github.com/perfectwebteam/craft-ohdear-application-health/issues/8))
+
+### Changed
+- Error log check now skips 4xx HTTP exceptions (bots, expired sessions, missing files) by default; set `errorLogIgnoreClientErrors` to `false` to count them again ([#8](https://github.com/perfectwebteam/craft-ohdear-application-health/issues/8))
+
 ## 1.4.0 – 2026-08-20
 ### Added
 - `errorLogFiles` and `errorLogLevels` config options for the error log check
